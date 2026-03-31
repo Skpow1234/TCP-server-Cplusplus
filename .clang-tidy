@@ -1,0 +1,36 @@
+---
+Checks: >
+  -*,
+  bugprone-*,
+  clang-analyzer-*,
+  cppcoreguidelines-*,
+  misc-*,
+  modernize-*,
+  -modernize-use-trailing-return-type,
+  performance-*,
+  portability-*,
+  readability-*
+
+WarningsAsErrors: >
+  clang-analyzer-*,
+  bugprone-*,
+  cppcoreguidelines-*,
+  modernize-*,
+  performance-*
+
+HeaderFilterRegex: '^(src|include|tests|benchmarks)/'
+
+CheckOptions:
+  - key:             modernize-use-trailing-return-type.IgnoreMacros
+    value:           'true'
+  - key:             readability-identifier-naming.IgnoreMainLikeFunctions
+    value:           'true'
+  - key:             cppcoreguidelines-avoid-magic-numbers.IgnoredIntegerValues
+    value:           '0;1;2;3;4;8;16;32;64;100;1024'
+  - key:             cppcoreguidelines-avoid-magic-numbers.IgnoredFloatingPointValues
+    value:           '0.0;1.0'
+  - key:             cppcoreguidelines-pro-type-vararg.IgnoreCFunctions
+    value:           'true'
+
+...
+

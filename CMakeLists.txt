@@ -8,6 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(TCP_SERVER_BUILD_TESTS "Build unit and integration tests" ON)
 option(TCP_SERVER_BUILD_BENCHMARKS "Build benchmark targets" ON)
+option(TCP_SERVER_ENABLE_CLANG_TIDY "Enable clang-tidy target" ON)
 
 add_library(tcp_server_core STATIC
     src/core/runtime.cpp
@@ -65,5 +66,43 @@ if(TCP_SERVER_BUILD_BENCHMARKS)
         benchmarks/decoder_benchmark.cpp
     )
     target_link_libraries(benchmark_decoder PRIVATE tcp_server_core)
+endif()
+
+if(TCP_SERVER_ENABLE_CLANG_TIDY)
+    find_program(CLANG_TIDY_EXE NAMES clang-tidy)
+    if(CLANG_TIDY_EXE)
+        set(TCP_SERVER_CLANG_TIDY_SOURCES
+            src/main.cpp
+            src/core/runtime.cpp
+            src/core/lifecycle.cpp
+            src/net/socket.cpp
+            src/net/acceptor.cpp
+            src/net/event_loop.cpp
+            src/net/connection.cpp
+            src/protocol/frame_decoder.cpp
+            src/protocol/frame_encoder.cpp
+            src/app/dispatcher.cpp
+            src/config/config_loader.cpp
+            src/config/config_validator.cpp
+            src/infra/logging.cpp
+            src/infra/metrics.cpp
+            tests/unit/config_tests.cpp
+            tests/integration/server_startup_tests.cpp
+            benchmarks/decoder_benchmark.cpp
+        )
+
+        add_custom_target(clang-tidy
+            COMMAND
+                ${CLANG_TIDY_EXE}
+                --quiet
+                -p ${CMAKE_BINARY_DIR}
+                ${TCP_SERVER_CLANG_TIDY_SOURCES}
+            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+            COMMENT "Running clang-tidy"
+            VERBATIM
+        )
+    else()
+        message(WARNING "clang-tidy not found; 'clang-tidy' target will not be available.")
+    endif()
 endif()
 
