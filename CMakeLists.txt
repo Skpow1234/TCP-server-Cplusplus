@@ -46,12 +46,22 @@ add_executable(tcp_server
 target_link_libraries(tcp_server PRIVATE tcp_server_core)
 
 if(TCP_SERVER_BUILD_TESTS)
+    include(FetchContent)
+
+    FetchContent_Declare(
+        Catch2
+        GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+        GIT_TAG v3.5.4
+    )
+    FetchContent_MakeAvailable(Catch2)
+
     enable_testing()
 
     add_executable(unit_config_tests
         tests/unit/config_tests.cpp
     )
-    target_link_libraries(unit_config_tests PRIVATE tcp_server_core)
+    target_link_libraries(unit_config_tests PRIVATE tcp_server_core Catch2::Catch2WithMain)
+
     add_test(NAME unit_config_tests COMMAND unit_config_tests)
 
     add_executable(integration_server_startup_tests
@@ -59,6 +69,16 @@ if(TCP_SERVER_BUILD_TESTS)
     )
     target_link_libraries(integration_server_startup_tests PRIVATE tcp_server_core)
     add_test(NAME integration_server_startup_tests COMMAND integration_server_startup_tests)
+
+    if(WIN32)
+        get_filename_component(TCP_SERVER_TOOLCHAIN_BIN_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
+        set_tests_properties(unit_config_tests PROPERTIES
+            ENVIRONMENT "PATH=${TCP_SERVER_TOOLCHAIN_BIN_DIR};$ENV{PATH}"
+        )
+        set_tests_properties(integration_server_startup_tests PROPERTIES
+            ENVIRONMENT "PATH=${TCP_SERVER_TOOLCHAIN_BIN_DIR};$ENV{PATH}"
+        )
+    endif()
 endif()
 
 if(TCP_SERVER_BUILD_BENCHMARKS)
