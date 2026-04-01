@@ -82,10 +82,23 @@ if(TCP_SERVER_BUILD_TESTS)
 endif()
 
 if(TCP_SERVER_BUILD_BENCHMARKS)
+    include(FetchContent)
+
+    set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+    set(BENCHMARK_ENABLE_GTEST_TESTS OFF CACHE BOOL "" FORCE)
+    set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
+
+    FetchContent_Declare(
+        benchmark
+        GIT_REPOSITORY https://github.com/google/benchmark.git
+        GIT_TAG v1.9.0
+    )
+    FetchContent_MakeAvailable(benchmark)
+
     add_executable(benchmark_decoder
         benchmarks/decoder_benchmark.cpp
     )
-    target_link_libraries(benchmark_decoder PRIVATE tcp_server_core)
+    target_link_libraries(benchmark_decoder PRIVATE tcp_server_core benchmark::benchmark_main)
 endif()
 
 if(TCP_SERVER_ENABLE_CLANG_TIDY)
