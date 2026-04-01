@@ -5,6 +5,7 @@
 #include <tcp_server/config_validator.hpp>
 
 #include <fstream>
+#include <cstdlib>
 #include <string>
 
 TEST_CASE("smoke: test framework runs") {
@@ -94,5 +95,92 @@ TEST_CASE("config validator: missing required values fails") {
     const auto err = tcp_server::validate_config(cfg);
     REQUIRE(err.has_value());
     REQUIRE(err->code == tcp_server::ConfigValidateError::Code::MissingRequiredValue);
+}
+
+TEST_CASE("config loader: invalid line fails with line number") {
+    const auto path = "tcp_server_test_config_invalid_line.cfg";
+    {
+        std::ofstream out(path, std::ios::binary);
+        REQUIRE(out.is_open());
+        out << "listen.host 0.0.0.0\n";  // missing '='
+    }
+
+    const auto loaded = tcp_server::load_config_from_file(path);
+    REQUIRE(!loaded.has_value());
+    REQUIRE(loaded.error().code == tcp_server::ConfigLoadError::Code::InvalidLine);
+    REQUIRE(loaded.error().line == 1);
+}
+
+TEST_CASE("config loader: unknown key fails") {
+    const auto path = "tcp_server_test_config_unknown_key.cfg";
+    {
+        std::ofstream out(path, std::ios::binary);
+        REQUIRE(out.is_open());
+        out << "listen.host=0.0.0.0\n";
+        out << "bogus.key=123\n";
+    }
+
+    const auto loaded = tcp_server::load_config_from_file(path);
+    REQUIRE(!loaded.has_value());
+    REQUIRE(loaded.error().code == tcp_server::ConfigLoadError::Code::UnknownKey);
+    REQUIRE(loaded.error().line == 2);
+}
+
+TEST_CASE("config loader: invalid value fails") {
+    const auto path = "tcp_server_test_config_invalid_value.cfg";
+    {
+        std::ofstream out(path, std::ios::binary);
+        REQUIRE(out.is_open());
+        out << "listen.port=not_a_number\n";
+    }
+
+    const auto loaded = tcp_server::load_config_from_file(path);
+    REQUIRE(!loaded.has_value());
+    REQUIRE(loaded.error().code == tcp_server::ConfigLoadError::Code::InvalidValue);
+    REQUIRE(loaded.error().line == 1);
+}
+
+TEST_CASE("config loader: environment overrides apply") {
+    const auto path = "tcp_server_test_config_env_override.cfg";
+    {
+        std::ofstream out(path, std::ios::binary);
+        REQUIRE(out.is_open());
+        out << "listen.port=1000\n";
+    }
+
+    REQUIRE(_putenv("TCP_SERVER__listen__port=2000") == 0);
+    const auto loaded = tcp_server::load_config_from_file(path);
+    REQUIRE(loaded.has_value());
+    REQUIRE(loaded->listen.port == 2000);
+    REQUIRE(_putenv("TCP_SERVER__listen__port=") == 0);
+}
+
+TEST_CASE("config loader: invalid environment override fails") {
+    const auto path = "tcp_server_test_config_env_override_invalid.cfg";
+    {
+        std::ofstream out(path, std::ios::binary);
+        REQUIRE(out.is_open());
+        out << "listen.port=1000\n";
+    }
+
+    REQUIRE(_putenv("TCP_SERVER__listen__port=99999") == 0);
+    const auto loaded = tcp_server::load_config_from_file(path);
+    REQUIRE(!loaded.has_value());
+    REQUIRE(loaded.error().code == tcp_server::ConfigLoadError::Code::InvalidValue);
+    REQUIRE(loaded.error().line == 0);
+    REQUIRE(_putenv("TCP_SERVER__listen__port=") == 0);
+}
+
+TEST_CASE("config validator: max_message_bytes guardrail triggers") {
+    tcp_server::ServerConfig cfg{};
+    cfg.listen.port = 1;
+    cfg.limits.max_connections = 1;
+    cfg.limits.max_message_bytes = (1024ULL * 1024ULL * 1024ULL) + 1;  // > 1 GiB
+    cfg.timeouts.idle_ms = 1;
+    cfg.runtime.worker_threads = 1;
+
+    const auto err = tcp_server::validate_config(cfg);
+    REQUIRE(err.has_value());
+    REQUIRE(err->code == tcp_server::ConfigValidateError::Code::OutOfRange);
 }
 
