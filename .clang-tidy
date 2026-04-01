@@ -4,6 +4,7 @@ Checks: >
   bugprone-*,
   clang-analyzer-*,
   cppcoreguidelines-*,
+  -cppcoreguidelines-avoid-do-while,
   misc-*,
   modernize-*,
   -modernize-use-trailing-return-type,

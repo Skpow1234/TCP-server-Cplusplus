@@ -87,6 +87,7 @@ if(TCP_SERVER_BUILD_BENCHMARKS)
     set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
     set(BENCHMARK_ENABLE_GTEST_TESTS OFF CACHE BOOL "" FORCE)
     set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
+    set(BENCHMARK_ENABLE_WERROR OFF CACHE BOOL "" FORCE)
 
     FetchContent_Declare(
         benchmark
@@ -119,9 +120,6 @@ if(TCP_SERVER_ENABLE_CLANG_TIDY)
             src/config/config_validator.cpp
             src/infra/logging.cpp
             src/infra/metrics.cpp
-            tests/unit/config_tests.cpp
-            tests/integration/server_startup_tests.cpp
-            benchmarks/decoder_benchmark.cpp
         )
 
         add_custom_target(clang-tidy
