@@ -7,6 +7,7 @@
 #include <tcp_server/metrics.hpp>
 #include <tcp_server/net/socket.hpp>
 #include <tcp_server/net/listener.hpp>
+#include <tcp_server/net/select_poller.hpp>
 
 #include <fstream>
 #include <cstdlib>
@@ -251,5 +252,25 @@ TEST_CASE("net listener: bind and listen works") {
     const auto listener = tcp_server::net::Listener::bind_and_listen("127.0.0.1", 0, 16);
     REQUIRE(listener.has_value());
     REQUIRE(listener->valid());
+}
+
+TEST_CASE("select poller: upsert/erase and timeout wait") {
+    tcp_server::net::NetworkSession net;
+    REQUIRE(net.ok());
+
+    tcp_server::net::SelectPoller poller;
+
+    auto s = tcp_server::net::Socket::create_tcp_v4();
+    REQUIRE(s.has_value());
+    REQUIRE(s->valid());
+
+    REQUIRE(poller.upsert(s->native_handle(), tcp_server::net::EventMask::Read).has_value());
+
+    tcp_server::net::Event events[8]{};
+    const auto n = poller.wait(events, 0);
+    REQUIRE(n.has_value());
+    REQUIRE(*n <= 8);
+
+    REQUIRE(poller.erase(s->native_handle()).has_value());
 }
 

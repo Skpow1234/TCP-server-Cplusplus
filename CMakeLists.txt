@@ -16,6 +16,7 @@ add_library(tcp_server_core STATIC
     src/net/socket.cpp
     src/net/acceptor.cpp
     src/net/event_loop.cpp
+    src/net/select_poller.cpp
     src/net/connection.cpp
     src/protocol/frame_decoder.cpp
     src/protocol/frame_encoder.cpp
@@ -113,7 +114,6 @@ if(TCP_SERVER_ENABLE_CLANG_TIDY)
             src/main.cpp
             src/core/runtime.cpp
             src/core/lifecycle.cpp
-            src/net/event_loop.cpp
             src/protocol/frame_decoder.cpp
             src/protocol/frame_encoder.cpp
             src/app/dispatcher.cpp
