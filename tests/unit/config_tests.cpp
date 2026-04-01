@@ -2,6 +2,7 @@
 
 #include <tcp_server/config.hpp>
 #include <tcp_server/config_loader.hpp>
+#include <tcp_server/config_validator.hpp>
 
 #include <fstream>
 #include <string>
@@ -76,5 +77,22 @@ TEST_CASE("config loader: parses key=value file") {
     REQUIRE(loaded->runtime.worker_threads == 7);
     REQUIRE(loaded->logging.level == tcp_server::LogLevel::Warn);
     REQUIRE(loaded->metrics.enabled);
+
+    const auto validation_error = tcp_server::validate_config(*loaded);
+    REQUIRE(!validation_error.has_value());
+}
+
+TEST_CASE("config validator: missing required values fails") {
+    tcp_server::ServerConfig cfg{};
+    cfg.listen.host = "127.0.0.1";
+    cfg.listen.port = 0;  // missing
+    cfg.limits.max_connections = 1;
+    cfg.limits.max_message_bytes = 1;
+    cfg.timeouts.idle_ms = 1;
+    cfg.runtime.worker_threads = 1;
+
+    const auto err = tcp_server::validate_config(cfg);
+    REQUIRE(err.has_value());
+    REQUIRE(err->code == tcp_server::ConfigValidateError::Code::MissingRequiredValue);
 }
 
