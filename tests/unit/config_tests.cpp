@@ -3,6 +3,7 @@
 #include <tcp_server/config.hpp>
 #include <tcp_server/config_loader.hpp>
 #include <tcp_server/config_validator.hpp>
+#include <tcp_server/logging.hpp>
 
 #include <fstream>
 #include <cstdlib>
@@ -182,5 +183,25 @@ TEST_CASE("config validator: max_message_bytes guardrail triggers") {
     const auto err = tcp_server::validate_config(cfg);
     REQUIRE(err.has_value());
     REQUIRE(err->code == tcp_server::ConfigValidateError::Code::OutOfRange);
+}
+
+TEST_CASE("logging: level filtering works") {
+    tcp_server::logging::configure(tcp_server::LoggingConfig{.level = tcp_server::LogLevel::Warn});
+    REQUIRE(!tcp_server::logging::enabled(tcp_server::LogLevel::Info));
+    REQUIRE(tcp_server::logging::enabled(tcp_server::LogLevel::Warn));
+    REQUIRE(tcp_server::logging::enabled(tcp_server::LogLevel::Error));
+}
+
+TEST_CASE("logging: log call is safe") {
+    tcp_server::logging::configure(tcp_server::LoggingConfig{.level = tcp_server::LogLevel::Info});
+    tcp_server::logging::log(
+        tcp_server::LogLevel::Info,
+        "hello",
+        {
+            {"conn_id", "1"},
+            {"event", "accept"},
+            {"note", "value with spaces"},
+        });
+    REQUIRE(true);
 }
 

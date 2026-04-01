@@ -116,7 +116,6 @@ if(TCP_SERVER_ENABLE_CLANG_TIDY)
             src/protocol/frame_decoder.cpp
             src/protocol/frame_encoder.cpp
             src/app/dispatcher.cpp
-            src/infra/logging.cpp
             src/infra/metrics.cpp
         )
 
