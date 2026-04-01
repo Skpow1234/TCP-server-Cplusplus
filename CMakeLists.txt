@@ -39,6 +39,10 @@ else()
     target_compile_options(tcp_server_core PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
+if(WIN32)
+    target_link_libraries(tcp_server_core PUBLIC ws2_32)
+endif()
+
 add_executable(tcp_server
     src/main.cpp
 )
@@ -109,7 +113,6 @@ if(TCP_SERVER_ENABLE_CLANG_TIDY)
             src/main.cpp
             src/core/runtime.cpp
             src/core/lifecycle.cpp
-            src/net/socket.cpp
             src/net/acceptor.cpp
             src/net/event_loop.cpp
             src/net/connection.cpp

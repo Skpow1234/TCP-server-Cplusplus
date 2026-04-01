@@ -5,6 +5,7 @@
 #include <tcp_server/config_validator.hpp>
 #include <tcp_server/logging.hpp>
 #include <tcp_server/metrics.hpp>
+#include <tcp_server/net/socket.hpp>
 
 #include <fstream>
 #include <cstdlib>
@@ -227,5 +228,18 @@ TEST_CASE("metrics: enabled records counters and gauges") {
     REQUIRE(tcp_server::metrics::enabled());
     REQUIRE(tcp_server::metrics::counter_get("bytes_in") == 10);
     REQUIRE(tcp_server::metrics::gauge_get("connections") == 12);
+}
+
+TEST_CASE("net socket: RAII create and close works") {
+    tcp_server::net::NetworkSession net;
+    REQUIRE(net.ok());
+
+    auto s = tcp_server::net::Socket::create_tcp_v4();
+    REQUIRE(s.has_value());
+    REQUIRE(s->valid());
+
+    const auto closed = s->close();
+    REQUIRE(closed.has_value());
+    REQUIRE(!s->valid());
 }
 
