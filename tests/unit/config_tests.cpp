@@ -6,6 +6,7 @@
 #include <tcp_server/logging.hpp>
 #include <tcp_server/metrics.hpp>
 #include <tcp_server/net/socket.hpp>
+#include <tcp_server/net/listener.hpp>
 
 #include <fstream>
 #include <cstdlib>
@@ -241,5 +242,14 @@ TEST_CASE("net socket: RAII create and close works") {
     const auto closed = s->close();
     REQUIRE(closed.has_value());
     REQUIRE(!s->valid());
+}
+
+TEST_CASE("net listener: bind and listen works") {
+    tcp_server::net::NetworkSession net;
+    REQUIRE(net.ok());
+
+    const auto listener = tcp_server::net::Listener::bind_and_listen("127.0.0.1", 0, 16);
+    REQUIRE(listener.has_value());
+    REQUIRE(listener->valid());
 }
 
