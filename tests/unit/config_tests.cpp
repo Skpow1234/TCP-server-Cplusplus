@@ -4,6 +4,7 @@
 #include <tcp_server/config_loader.hpp>
 #include <tcp_server/config_validator.hpp>
 #include <tcp_server/logging.hpp>
+#include <tcp_server/metrics.hpp>
 
 #include <fstream>
 #include <cstdlib>
@@ -203,5 +204,28 @@ TEST_CASE("logging: log call is safe") {
             {"note", "value with spaces"},
         });
     REQUIRE(true);
+}
+
+TEST_CASE("metrics: disabled is no-op") {
+    tcp_server::metrics::configure(tcp_server::MetricsConfig{.enabled = false});
+
+    tcp_server::metrics::counter_add("accepts", 5);
+    tcp_server::metrics::gauge_set("connections", 10);
+
+    REQUIRE(!tcp_server::metrics::enabled());
+    REQUIRE(tcp_server::metrics::counter_get("accepts") == 0);
+    REQUIRE(tcp_server::metrics::gauge_get("connections") == 0);
+}
+
+TEST_CASE("metrics: enabled records counters and gauges") {
+    tcp_server::metrics::configure(tcp_server::MetricsConfig{.enabled = true});
+
+    tcp_server::metrics::counter_add("bytes_in", 3);
+    tcp_server::metrics::counter_add("bytes_in", 7);
+    tcp_server::metrics::gauge_set("connections", 12);
+
+    REQUIRE(tcp_server::metrics::enabled());
+    REQUIRE(tcp_server::metrics::counter_get("bytes_in") == 10);
+    REQUIRE(tcp_server::metrics::gauge_get("connections") == 12);
 }
 
