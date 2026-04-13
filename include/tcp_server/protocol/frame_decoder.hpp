@@ -3,7 +3,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
-#include <string>
 #include <vector>
 
 namespace tcp_server::protocol {
