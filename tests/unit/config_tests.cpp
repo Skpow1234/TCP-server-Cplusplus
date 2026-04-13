@@ -7,8 +7,10 @@
 #include <tcp_server/metrics.hpp>
 #include <tcp_server/net/socket.hpp>
 #include <tcp_server/net/listener.hpp>
+#include <tcp_server/net/connection.hpp>
 #include <tcp_server/net/select_poller.hpp>
 
+#include <array>
 #include <fstream>
 #include <cstdlib>
 #include <string>
@@ -272,5 +274,37 @@ TEST_CASE("select poller: upsert/erase and timeout wait") {
     REQUIRE(*n <= 8);
 
     REQUIRE(poller.erase(s->native_handle()).has_value());
+}
+
+TEST_CASE("connection: buffers and state") {
+    tcp_server::net::NetworkSession net;
+    REQUIRE(net.ok());
+
+    auto sock = tcp_server::net::Socket::create_tcp_v4();
+    REQUIRE(sock.has_value());
+
+    tcp_server::net::Connection conn{std::move(*sock)};
+    REQUIRE(conn.state() == tcp_server::net::ConnectionState::Reading);
+    REQUIRE(conn.read_buffer().empty());
+    REQUIRE(conn.write_buffer().empty());
+
+    const std::array<std::byte, 3> chunk{
+        std::byte{1},
+        std::byte{2},
+        std::byte{3},
+    };
+    conn.append_read(chunk);
+    REQUIRE(conn.read_buffer().size() == 3);
+
+    conn.consume_read(1);
+    REQUIRE(conn.read_buffer().size() == 2);
+
+    conn.append_write(std::span<const std::byte>(chunk));
+    REQUIRE(conn.write_buffer().size() == 3);
+    conn.clear_write();
+    REQUIRE(conn.write_buffer().empty());
+
+    conn.set_state(tcp_server::net::ConnectionState::Writing);
+    REQUIRE(conn.state() == tcp_server::net::ConnectionState::Writing);
 }
 

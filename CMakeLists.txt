@@ -17,6 +17,7 @@ add_library(tcp_server_core STATIC
     src/net/acceptor.cpp
     src/net/event_loop.cpp
     src/net/select_poller.cpp
+    src/net/accept_ops.cpp
     src/net/connection.cpp
     src/protocol/frame_decoder.cpp
     src/protocol/frame_encoder.cpp
