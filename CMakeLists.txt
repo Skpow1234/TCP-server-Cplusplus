@@ -68,6 +68,7 @@ if(TCP_SERVER_BUILD_TESTS)
     add_executable(unit_config_tests
         tests/unit/config_tests.cpp
         tests/unit/frame_decoder_tests.cpp
+        tests/unit/frame_encoder_tests.cpp
     )
     target_link_libraries(unit_config_tests PRIVATE tcp_server_core Catch2::Catch2WithMain)
 
