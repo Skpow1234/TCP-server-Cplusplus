@@ -29,6 +29,7 @@ public:
     explicit Listener(Socket s) : socket_(std::move(s)) {}
 
     [[nodiscard]] auto valid() const -> bool { return socket_.valid(); }
+    [[nodiscard]] auto socket() -> Socket& { return socket_; }
     [[nodiscard]] auto socket() const -> const Socket& { return socket_; }
 
     // Creates, binds, and starts listening.
