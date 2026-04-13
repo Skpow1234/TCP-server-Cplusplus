@@ -11,6 +11,7 @@ struct SocketError {
         NotInitialized,
         CreateFailed,
         CloseFailed,
+        NonBlockingFailed,
     };
 
     Code code{};
@@ -65,6 +66,8 @@ public:
     [[nodiscard]] auto native_handle() const -> NativeSocket { return socket_; }
 
     [[nodiscard]] auto close() -> std::expected<void, SocketError>;
+
+    [[nodiscard]] auto set_nonblocking(bool enable) -> std::expected<void, SocketError>;
 
     [[nodiscard]] auto release() -> NativeSocket;
     void reset(NativeSocket s = k_invalid_socket);

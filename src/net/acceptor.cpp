@@ -135,6 +135,12 @@ auto Acceptor::accept_and_register(Poller& poller) -> std::expected<Connection, 
         return std::unexpected(accepted.error());
     }
     Connection conn{std::move(*accepted)};
+    if (auto nb = conn.socket().set_nonblocking(true); !nb) {
+        return std::unexpected(AcceptError{
+            "failed to set non-blocking mode on accepted socket: " + nb.error().message,
+            nb.error().native_error,
+        });
+    }
     if (auto reg = poller.upsert(conn.native_handle(), EventMask::Read); !reg) {
         return std::unexpected(AcceptError{
             "failed to register accepted socket: " + reg.error().message,

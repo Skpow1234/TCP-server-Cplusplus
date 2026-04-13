@@ -10,6 +10,7 @@
 #    include <ws2tcpip.h>
 #else
 #    include <cerrno>
+#    include <fcntl.h>
 #    include <cstring>
 #    include <sys/socket.h>
 #    include <unistd.h>
@@ -80,6 +81,33 @@ auto Socket::create_tcp_v4() -> std::expected<Socket, SocketError> {
         return std::unexpected(make_error(SocketError::Code::CreateFailed, "socket() failed", errno));
     }
     return Socket{s};
+#endif
+}
+
+auto Socket::set_nonblocking(bool enable) -> std::expected<void, SocketError> {
+    if (!valid()) {
+        return std::unexpected(make_error(SocketError::Code::NotInitialized, "socket is invalid", 0));
+    }
+
+#if defined(_WIN32)
+    u_long mode = enable ? 1UL : 0UL;
+    if (::ioctlsocket(static_cast<SOCKET>(socket_), FIONBIO, &mode) != 0) {
+        return std::unexpected(make_error(
+            SocketError::Code::NonBlockingFailed, "ioctlsocket(FIONBIO) failed", ::WSAGetLastError()));
+    }
+    return {};
+#else
+    const int flags = ::fcntl(static_cast<int>(socket_), F_GETFL, 0);
+    if (flags < 0) {
+        return std::unexpected(
+            make_error(SocketError::Code::NonBlockingFailed, "fcntl(F_GETFL) failed", errno));
+    }
+    const int new_flags = enable ? (flags | O_NONBLOCK) : (flags & ~O_NONBLOCK);
+    if (::fcntl(static_cast<int>(socket_), F_SETFL, new_flags) != 0) {
+        return std::unexpected(
+            make_error(SocketError::Code::NonBlockingFailed, "fcntl(F_SETFL) failed", errno));
+    }
+    return {};
 #endif
 }
 

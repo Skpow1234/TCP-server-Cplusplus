@@ -10,6 +10,7 @@
 #include <tcp_server/net/socket.hpp>
 #include <tcp_server/net/listener.hpp>
 #include <tcp_server/net/connection.hpp>
+#include <tcp_server/net/recv.hpp>
 #include <tcp_server/net/select_poller.hpp>
 
 #include <array>
@@ -59,6 +60,40 @@ auto connect_v4_loopback(std::uint16_t port) -> bool {
     const int rc = ::connect(s, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr));
     ::close(s);
     return rc == 0;
+#endif
+}
+
+void connect_and_send(std::uint16_t port, const char* data, std::size_t len) {
+#if defined(_WIN32)
+    const auto s = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (s == INVALID_SOCKET) {
+        return;
+    }
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    if (::connect(s, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)) != 0) {
+        ::closesocket(s);
+        return;
+    }
+    (void)::send(s, data, static_cast<int>(len), 0);
+    ::closesocket(s);
+#else
+    const int s = ::socket(AF_INET, SOCK_STREAM, 0);
+    if (s < 0) {
+        return;
+    }
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    if (::connect(s, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)) != 0) {
+        ::close(s);
+        return;
+    }
+    (void)::send(s, data, len, 0);
+    ::close(s);
 #endif
 }
 
@@ -400,5 +435,67 @@ TEST_CASE("acceptor: register listener and accept new connection into poller") {
     REQUIRE(client_ok.load());
 
     REQUIRE(acceptor.unregister_listener(poller).has_value());
+}
+
+TEST_CASE("net recv: non-blocking receive after readable event") {
+    tcp_server::net::NetworkSession net;
+    REQUIRE(net.ok());
+
+    auto listener = tcp_server::net::Listener::bind_and_listen("127.0.0.1", 0, 16);
+    REQUIRE(listener.has_value());
+    const auto port = tcp_server::net::local_port_v4(listener->socket());
+    REQUIRE(port.has_value());
+
+    tcp_server::net::SelectPoller poller;
+    tcp_server::net::Acceptor acceptor{std::move(*listener)};
+    REQUIRE(acceptor.register_listener(poller).has_value());
+
+    std::thread client_thread([p = *port] { connect_and_send(p, "hi!", 3); });
+
+    tcp_server::net::Event events[8]{};
+    bool saw_listener_read = false;
+    for (int attempt = 0; attempt < 100 && !saw_listener_read; ++attempt) {
+        const auto n = poller.wait(events, 50);
+        REQUIRE(n.has_value());
+        for (std::size_t i = 0; i < *n; ++i) {
+            if (events[i].socket == acceptor.listener_handle()
+                && (events[i].mask & tcp_server::net::EventMask::Read) != tcp_server::net::EventMask::None) {
+                saw_listener_read = true;
+                break;
+            }
+        }
+    }
+    REQUIRE(saw_listener_read);
+
+    auto accepted = acceptor.accept_and_register(poller);
+    REQUIRE(accepted.has_value());
+    tcp_server::net::Connection conn = std::move(*accepted);
+
+    bool saw_conn_read = false;
+    for (int attempt = 0; attempt < 100 && !saw_conn_read; ++attempt) {
+        const auto n = poller.wait(events, 50);
+        REQUIRE(n.has_value());
+        for (std::size_t i = 0; i < *n; ++i) {
+            if (events[i].socket == conn.native_handle()
+                && (events[i].mask & tcp_server::net::EventMask::Read) != tcp_server::net::EventMask::None) {
+                saw_conn_read = true;
+                break;
+            }
+        }
+    }
+    REQUIRE(saw_conn_read);
+
+    std::array<std::byte, 64> scratch{};
+    const auto got = tcp_server::net::receive_nonblocking(conn, scratch);
+    REQUIRE(got.has_value());
+    REQUIRE(*got == 3);
+    REQUIRE(conn.read_buffer().size() == 3);
+    REQUIRE(conn.read_buffer()[0] == std::byte{'h'});
+    REQUIRE(conn.read_buffer()[1] == std::byte{'i'});
+    REQUIRE(conn.read_buffer()[2] == std::byte{'!'});
+
+    client_thread.join();
+    REQUIRE(acceptor.unregister_listener(poller).has_value());
+    REQUIRE(poller.erase(conn.native_handle()).has_value());
 }
 
