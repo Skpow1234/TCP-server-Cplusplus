@@ -5,15 +5,64 @@
 #include <tcp_server/config_validator.hpp>
 #include <tcp_server/logging.hpp>
 #include <tcp_server/metrics.hpp>
+#include <tcp_server/net/accept.hpp>
+#include <tcp_server/net/acceptor.hpp>
 #include <tcp_server/net/socket.hpp>
 #include <tcp_server/net/listener.hpp>
 #include <tcp_server/net/connection.hpp>
 #include <tcp_server/net/select_poller.hpp>
 
 #include <array>
+#include <atomic>
 #include <fstream>
 #include <cstdlib>
 #include <string>
+#include <thread>
+
+#if defined(_WIN32)
+#    ifndef NOMINMAX
+#        define NOMINMAX
+#    endif
+#    include <winsock2.h>
+#    include <ws2tcpip.h>
+#else
+#    include <arpa/inet.h>
+#    include <netinet/in.h>
+#    include <sys/socket.h>
+#    include <unistd.h>
+#endif
+
+namespace {
+
+auto connect_v4_loopback(std::uint16_t port) -> bool {
+#if defined(_WIN32)
+    const auto s = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (s == INVALID_SOCKET) {
+        return false;
+    }
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    const int rc = ::connect(s, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr));
+    ::closesocket(s);
+    return rc == 0;
+#else
+    const int s = ::socket(AF_INET, SOCK_STREAM, 0);
+    if (s < 0) {
+        return false;
+    }
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    const int rc = ::connect(s, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr));
+    ::close(s);
+    return rc == 0;
+#endif
+}
+
+}  // namespace
 
 TEST_CASE("smoke: test framework runs") {
     REQUIRE(true);
@@ -306,5 +355,50 @@ TEST_CASE("connection: buffers and state") {
 
     conn.set_state(tcp_server::net::ConnectionState::Writing);
     REQUIRE(conn.state() == tcp_server::net::ConnectionState::Writing);
+}
+
+TEST_CASE("acceptor: register listener and accept new connection into poller") {
+    tcp_server::net::NetworkSession net;
+    REQUIRE(net.ok());
+
+    auto listener = tcp_server::net::Listener::bind_and_listen("127.0.0.1", 0, 16);
+    REQUIRE(listener.has_value());
+
+    const auto port = tcp_server::net::local_port_v4(listener->socket());
+    REQUIRE(port.has_value());
+    REQUIRE(*port != 0);
+
+    tcp_server::net::SelectPoller poller;
+    tcp_server::net::Acceptor acceptor{std::move(*listener)};
+    REQUIRE(acceptor.register_listener(poller).has_value());
+
+    std::atomic<bool> client_ok{false};
+    std::thread client_thread([p = *port, &client_ok] {
+        client_ok = connect_v4_loopback(p);
+    });
+
+    tcp_server::net::Event events[8]{};
+    bool saw_listener_read = false;
+    for (int attempt = 0; attempt < 100 && !saw_listener_read; ++attempt) {
+        const auto n = poller.wait(events, 50);
+        REQUIRE(n.has_value());
+        for (std::size_t i = 0; i < *n; ++i) {
+            if (events[i].socket == acceptor.listener_handle()
+                && (events[i].mask & tcp_server::net::EventMask::Read) != tcp_server::net::EventMask::None) {
+                saw_listener_read = true;
+                break;
+            }
+        }
+    }
+    REQUIRE(saw_listener_read);
+
+    const auto conn = acceptor.accept_and_register(poller);
+    REQUIRE(conn.has_value());
+    REQUIRE(conn->socket().valid());
+
+    client_thread.join();
+    REQUIRE(client_ok.load());
+
+    REQUIRE(acceptor.unregister_listener(poller).has_value());
 }
 

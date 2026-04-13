@@ -1,4 +1,4 @@
-#include <tcp_server/net/listener.hpp>
+#include <tcp_server/net/acceptor.hpp>
 
 #include <memory>
 #include <string>
@@ -119,6 +119,30 @@ auto Listener::bind_and_listen(std::string_view host, std::uint16_t port, int ba
 #endif
 }
 
-}  // namespace tcp_server::net
+Acceptor::Acceptor(Listener listener) : listener_(std::move(listener)) {}
 
+auto Acceptor::register_listener(Poller& poller) -> std::expected<void, PollError> {
+    return poller.upsert(listener_handle(), EventMask::Read);
+}
+
+auto Acceptor::unregister_listener(Poller& poller) -> std::expected<void, PollError> {
+    return poller.erase(listener_handle());
+}
+
+auto Acceptor::accept_and_register(Poller& poller) -> std::expected<Connection, AcceptError> {
+    auto accepted = accept_one(listener_.socket());
+    if (!accepted) {
+        return std::unexpected(accepted.error());
+    }
+    Connection conn{std::move(*accepted)};
+    if (auto reg = poller.upsert(conn.native_handle(), EventMask::Read); !reg) {
+        return std::unexpected(AcceptError{
+            "failed to register accepted socket: " + reg.error().message,
+            reg.error().native_error,
+        });
+    }
+    return conn;
+}
+
+}  // namespace tcp_server::net
 
