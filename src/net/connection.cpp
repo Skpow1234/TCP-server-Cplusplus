@@ -20,6 +20,14 @@ void Connection::append_write(std::span<const std::byte> data) {
     write_buf_.insert(write_buf_.end(), data.begin(), data.end());
 }
 
+void Connection::consume_write(std::size_t byte_count) {
+    if (byte_count >= write_buf_.size()) {
+        write_buf_.clear();
+        return;
+    }
+    write_buf_.erase(write_buf_.begin(), write_buf_.begin() + static_cast<std::ptrdiff_t>(byte_count));
+}
+
 void Connection::clear_write() {
     write_buf_.clear();
 }

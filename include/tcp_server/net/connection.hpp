@@ -46,6 +46,7 @@ public:
     void append_read(std::span<const std::byte> data);
     void consume_read(std::size_t byte_count);
     void append_write(std::span<const std::byte> data);
+    void consume_write(std::size_t byte_count);
     void clear_write();
 
     [[nodiscard]] auto native_handle() const -> NativeSocket { return socket_.native_handle(); }

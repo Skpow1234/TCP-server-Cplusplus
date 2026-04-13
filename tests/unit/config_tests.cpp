@@ -11,11 +11,13 @@
 #include <tcp_server/net/listener.hpp>
 #include <tcp_server/net/connection.hpp>
 #include <tcp_server/net/recv.hpp>
+#include <tcp_server/net/send.hpp>
 #include <tcp_server/net/select_poller.hpp>
 
 #include <array>
 #include <atomic>
 #include <fstream>
+#include <span>
 #include <cstdlib>
 #include <string>
 #include <thread>
@@ -94,6 +96,19 @@ void connect_and_send(std::uint16_t port, const char* data, std::size_t len) {
     }
     (void)::send(s, data, len, 0);
     ::close(s);
+#endif
+}
+
+void set_socket_send_buffer(tcp_server::net::NativeSocket handle, int bytes) {
+#if defined(_WIN32)
+    (void)::setsockopt(
+        static_cast<SOCKET>(handle),
+        SOL_SOCKET,
+        SO_SNDBUF,
+        reinterpret_cast<const char*>(&bytes),
+        static_cast<int>(sizeof(bytes)));
+#else
+    (void)::setsockopt(static_cast<int>(handle), SOL_SOCKET, SO_SNDBUF, &bytes, sizeof(bytes));
 #endif
 }
 
@@ -385,6 +400,8 @@ TEST_CASE("connection: buffers and state") {
 
     conn.append_write(std::span<const std::byte>(chunk));
     REQUIRE(conn.write_buffer().size() == 3);
+    conn.consume_write(1);
+    REQUIRE(conn.write_buffer().size() == 2);
     conn.clear_write();
     REQUIRE(conn.write_buffer().empty());
 
@@ -495,6 +512,228 @@ TEST_CASE("net recv: non-blocking receive after readable event") {
     REQUIRE(conn.read_buffer()[2] == std::byte{'!'});
 
     client_thread.join();
+    REQUIRE(acceptor.unregister_listener(poller).has_value());
+    REQUIRE(poller.erase(conn.native_handle()).has_value());
+}
+
+TEST_CASE("net send: flush_write_nonblocking delivers payload") {
+    tcp_server::net::NetworkSession net;
+    REQUIRE(net.ok());
+
+    auto listener = tcp_server::net::Listener::bind_and_listen("127.0.0.1", 0, 16);
+    REQUIRE(listener.has_value());
+    const auto port = tcp_server::net::local_port_v4(listener->socket());
+    REQUIRE(port.has_value());
+
+    std::array<char, 8> client_buf{};
+    std::atomic<int> recv_len{-1};
+
+    std::thread client_thread([p = *port, &client_buf, &recv_len] {
+#if defined(_WIN32)
+        const auto s = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if (s == INVALID_SOCKET) {
+            recv_len = -2;
+            return;
+        }
+        sockaddr_in addr{};
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(p);
+        addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        if (::connect(s, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)) != 0) {
+            ::closesocket(s);
+            recv_len = -3;
+            return;
+        }
+        recv_len = static_cast<int>(
+            ::recv(s, client_buf.data(), static_cast<int>(client_buf.size()), 0));
+        ::closesocket(s);
+#else
+        const int s = ::socket(AF_INET, SOCK_STREAM, 0);
+        if (s < 0) {
+            recv_len = -2;
+            return;
+        }
+        sockaddr_in addr{};
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(p);
+        addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        if (::connect(s, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)) != 0) {
+            ::close(s);
+            recv_len = -3;
+            return;
+        }
+        recv_len = static_cast<int>(::recv(s, client_buf.data(), client_buf.size(), 0));
+        ::close(s);
+#endif
+    });
+
+    tcp_server::net::SelectPoller poller;
+    tcp_server::net::Acceptor acceptor{std::move(*listener)};
+    REQUIRE(acceptor.register_listener(poller).has_value());
+
+    tcp_server::net::Event events[8]{};
+    bool saw_listener_read = false;
+    for (int attempt = 0; attempt < 100 && !saw_listener_read; ++attempt) {
+        const auto n = poller.wait(events, 50);
+        REQUIRE(n.has_value());
+        for (std::size_t i = 0; i < *n; ++i) {
+            if (events[i].socket == acceptor.listener_handle()
+                && (events[i].mask & tcp_server::net::EventMask::Read) != tcp_server::net::EventMask::None) {
+                saw_listener_read = true;
+                break;
+            }
+        }
+    }
+    REQUIRE(saw_listener_read);
+
+    auto accepted = acceptor.accept_and_register(poller);
+    REQUIRE(accepted.has_value());
+    tcp_server::net::Connection conn = std::move(*accepted);
+
+    const std::string payload = "ok";
+    conn.append_write(std::as_bytes(std::span<const char>(payload.data(), payload.size())));
+    REQUIRE(poller
+                .upsert(conn.native_handle(), tcp_server::net::EventMask::Read | tcp_server::net::EventMask::Write)
+                .has_value());
+
+    bool flushed = false;
+    for (int attempt = 0; attempt < 100 && !flushed; ++attempt) {
+        const auto sent = tcp_server::net::flush_write_nonblocking(conn);
+        if (sent.has_value() && *sent > 0) {
+            flushed = true;
+            break;
+        }
+        if (!sent.has_value() && sent.error().code == tcp_server::net::SendError::Code::WouldBlock) {
+            const auto n = poller.wait(events, 50);
+            REQUIRE(n.has_value());
+            continue;
+        }
+        if (!sent.has_value()) {
+            FAIL("unexpected send error: " << sent.error().message);
+        }
+    }
+    REQUIRE(flushed);
+    REQUIRE(conn.write_buffer().empty());
+
+    client_thread.join();
+    REQUIRE(recv_len.load() == 2);
+    REQUIRE(client_buf[0] == 'o');
+    REQUIRE(client_buf[1] == 'k');
+
+    REQUIRE(acceptor.unregister_listener(poller).has_value());
+    REQUIRE(poller.erase(conn.native_handle()).has_value());
+}
+
+TEST_CASE("net send: partial flush with small send buffer") {
+    tcp_server::net::NetworkSession net;
+    REQUIRE(net.ok());
+
+    auto listener = tcp_server::net::Listener::bind_and_listen("127.0.0.1", 0, 16);
+    REQUIRE(listener.has_value());
+    const auto port = tcp_server::net::local_port_v4(listener->socket());
+    REQUIRE(port.has_value());
+
+    std::atomic<int> total_client_read{0};
+    constexpr int k_expect = 512;
+
+    std::thread client_thread([p = *port, &total_client_read, k_expect] {
+#if defined(_WIN32)
+        const auto s = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if (s == INVALID_SOCKET) {
+            return;
+        }
+        sockaddr_in addr{};
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(p);
+        addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        if (::connect(s, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)) != 0) {
+            ::closesocket(s);
+            return;
+        }
+        std::array<char, 64> buf{};
+        int got = 0;
+        while (total_client_read.load(std::memory_order_relaxed) < k_expect
+               && (got = ::recv(s, buf.data(), static_cast<int>(buf.size()), 0)) > 0) {
+            total_client_read.fetch_add(got, std::memory_order_relaxed);
+        }
+        ::closesocket(s);
+#else
+        const int s = ::socket(AF_INET, SOCK_STREAM, 0);
+        if (s < 0) {
+            return;
+        }
+        sockaddr_in addr{};
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(p);
+        addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        if (::connect(s, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)) != 0) {
+            ::close(s);
+            return;
+        }
+        std::array<char, 64> buf{};
+        ssize_t got = 0;
+        while (total_client_read.load(std::memory_order_relaxed) < k_expect
+               && (got = ::recv(s, buf.data(), buf.size(), 0)) > 0) {
+            total_client_read.fetch_add(static_cast<int>(got), std::memory_order_relaxed);
+        }
+        ::close(s);
+#endif
+    });
+
+    tcp_server::net::SelectPoller poller;
+    tcp_server::net::Acceptor acceptor{std::move(*listener)};
+    REQUIRE(acceptor.register_listener(poller).has_value());
+
+    tcp_server::net::Event events[8]{};
+    bool saw_listener_read = false;
+    for (int attempt = 0; attempt < 100 && !saw_listener_read; ++attempt) {
+        const auto n = poller.wait(events, 50);
+        REQUIRE(n.has_value());
+        for (std::size_t i = 0; i < *n; ++i) {
+            if (events[i].socket == acceptor.listener_handle()
+                && (events[i].mask & tcp_server::net::EventMask::Read) != tcp_server::net::EventMask::None) {
+                saw_listener_read = true;
+                break;
+            }
+        }
+    }
+    REQUIRE(saw_listener_read);
+
+    auto accepted = acceptor.accept_and_register(poller);
+    REQUIRE(accepted.has_value());
+    tcp_server::net::Connection conn = std::move(*accepted);
+
+    set_socket_send_buffer(conn.native_handle(), 128);
+
+    conn.write_buffer().reserve(static_cast<std::size_t>(k_expect));
+    for (int i = 0; i < k_expect; ++i) {
+        conn.write_buffer().push_back(static_cast<std::byte>(i & 0xFF));
+    }
+
+    REQUIRE(
+        poller
+            .upsert(conn.native_handle(), tcp_server::net::EventMask::Read | tcp_server::net::EventMask::Write)
+            .has_value());
+
+    std::size_t total_sent = 0;
+    for (int attempt = 0; attempt < 500 && !conn.write_buffer().empty(); ++attempt) {
+        const auto sent = tcp_server::net::flush_write_nonblocking(conn);
+        if (!sent.has_value()) {
+            if (sent.error().code == tcp_server::net::SendError::Code::WouldBlock) {
+                (void)poller.wait(events, 50);
+                continue;
+            }
+            FAIL("send failed: " << sent.error().message);
+        }
+        total_sent += *sent;
+    }
+
+    REQUIRE(conn.write_buffer().empty());
+    REQUIRE(total_sent == static_cast<std::size_t>(k_expect));
+
+    client_thread.join();
+    REQUIRE(total_client_read.load(std::memory_order_relaxed) == k_expect);
+
     REQUIRE(acceptor.unregister_listener(poller).has_value());
     REQUIRE(poller.erase(conn.native_handle()).has_value());
 }

@@ -20,6 +20,7 @@ add_library(tcp_server_core STATIC
     src/net/accept_ops.cpp
     src/net/connection.cpp
     src/net/recv.cpp
+    src/net/send.cpp
     src/protocol/frame_decoder.cpp
     src/protocol/frame_encoder.cpp
     src/app/dispatcher.cpp
