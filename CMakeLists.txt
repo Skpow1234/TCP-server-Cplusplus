@@ -19,6 +19,7 @@ add_library(tcp_server_core STATIC
     src/net/select_poller.cpp
     src/net/accept_ops.cpp
     src/net/connection.cpp
+    src/net/idle_timeout_manager.cpp
     src/net/recv.cpp
     src/net/send.cpp
     src/protocol/frame_decoder.cpp
@@ -72,6 +73,7 @@ if(TCP_SERVER_BUILD_TESTS)
         tests/unit/frame_encoder_tests.cpp
         tests/unit/dispatcher_tests.cpp
         tests/unit/worker_pool_tests.cpp
+        tests/unit/idle_timeout_manager_tests.cpp
     )
     target_link_libraries(unit_config_tests PRIVATE tcp_server_core Catch2::Catch2WithMain)
 
@@ -135,6 +137,7 @@ if(TCP_SERVER_ENABLE_CLANG_TIDY)
             src/protocol/frame_encoder.cpp
             src/app/dispatcher.cpp
             src/runtime/worker_pool.cpp
+            src/net/idle_timeout_manager.cpp
         )
 
         add_custom_target(clang-tidy
