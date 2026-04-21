@@ -135,27 +135,45 @@
   "testPresets": [
     {
       "name": "debug",
-      "configurePreset": "debug"
+      "configurePreset": "debug",
+      "execution": {
+        "stopOnFailure": true
+      }
     },
     {
       "name": "mingw-debug",
-      "configurePreset": "mingw-debug"
+      "configurePreset": "mingw-debug",
+      "execution": {
+        "stopOnFailure": true
+      }
     },
     {
       "name": "asan-ubsan",
-      "configurePreset": "asan-ubsan"
+      "configurePreset": "asan-ubsan",
+      "execution": {
+        "stopOnFailure": true
+      }
     },
     {
       "name": "mingw-asan-ubsan",
-      "configurePreset": "mingw-asan-ubsan"
+      "configurePreset": "mingw-asan-ubsan",
+      "execution": {
+        "stopOnFailure": true
+      }
     },
     {
       "name": "tsan",
-      "configurePreset": "tsan"
+      "configurePreset": "tsan",
+      "execution": {
+        "stopOnFailure": true
+      }
     },
     {
       "name": "mingw-tsan",
-      "configurePreset": "mingw-tsan"
+      "configurePreset": "mingw-tsan",
+      "execution": {
+        "stopOnFailure": true
+      }
     }
   ]
 }

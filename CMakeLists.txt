@@ -9,6 +9,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(TCP_SERVER_BUILD_TESTS "Build unit and integration tests" ON)
 option(TCP_SERVER_BUILD_BENCHMARKS "Build benchmark targets" ON)
 option(TCP_SERVER_ENABLE_CLANG_TIDY "Enable clang-tidy target" ON)
+option(TCP_SERVER_ADD_SANITIZER_DRIVER_TARGETS "Add sanitizer-*-test targets (configure/build/ctest out-of-tree sanitizer presets)" ON)
 
 add_library(tcp_server_core STATIC
     src/core/runtime.cpp
@@ -134,6 +135,27 @@ if(TCP_SERVER_BUILD_BENCHMARKS)
         benchmarks/decoder_benchmark.cpp
     )
     target_link_libraries(benchmark_decoder PRIVATE tcp_server_core benchmark::benchmark_main)
+endif()
+
+if(TCP_SERVER_ADD_SANITIZER_DRIVER_TARGETS)
+    macro(tcp_server_add_sanitizer_driver target_name preset_name)
+        add_custom_target(
+            ${target_name}
+            COMMAND ${CMAKE_COMMAND} -E echo "Sanitizer: ${preset_name} (configure + build + ctest)"
+            COMMAND ${CMAKE_COMMAND} --preset ${preset_name} -S "${CMAKE_SOURCE_DIR}" -B "${CMAKE_SOURCE_DIR}/out/build/${preset_name}"
+            COMMAND ${CMAKE_COMMAND} --build "${CMAKE_SOURCE_DIR}/out/build/${preset_name}" --parallel
+            COMMAND ${CMAKE_CTEST_COMMAND} --test-dir "${CMAKE_SOURCE_DIR}/out/build/${preset_name}" --output-on-failure
+            WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+            USES_TERMINAL
+            COMMENT "Sanitizer preset ${preset_name}: configure, build, ctest"
+            VERBATIM
+        )
+    endmacro()
+
+    tcp_server_add_sanitizer_driver(sanitizer-asan-ubsan-test asan-ubsan)
+    tcp_server_add_sanitizer_driver(sanitizer-tsan-test tsan)
+    tcp_server_add_sanitizer_driver(sanitizer-mingw-asan-ubsan-test mingw-asan-ubsan)
+    tcp_server_add_sanitizer_driver(sanitizer-mingw-tsan-test mingw-tsan)
 endif()
 
 if(TCP_SERVER_ENABLE_CLANG_TIDY)
