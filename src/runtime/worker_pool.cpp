@@ -6,15 +6,24 @@
 
 namespace tcp_server::runtime {
 
-WorkerPool::WorkerPool(std::size_t num_workers, std::size_t queue_capacity, app::RequestDispatcher& dispatcher)
+WorkerPool::WorkerPool(
+    std::size_t num_workers,
+    std::size_t queue_capacity,
+    app::RequestDispatcher& dispatcher,
+    WorkerPoolOptions options)
     : dispatcher_(dispatcher)
+    , options_(options)
     , task_capacity_(queue_capacity)
-    , result_capacity_(queue_capacity) {
+    , result_capacity_(
+          options.result_queue_capacity_override != 0 ? options.result_queue_capacity_override : queue_capacity) {
     if (num_workers == 0) {
         throw std::invalid_argument("WorkerPool: num_workers must be >= 1");
     }
     if (queue_capacity == 0) {
         throw std::invalid_argument("WorkerPool: queue_capacity must be >= 1");
+    }
+    if (result_capacity_ == 0) {
+        throw std::invalid_argument("WorkerPool: effective result queue capacity must be >= 1");
     }
 
     workers_.reserve(num_workers);
@@ -44,7 +53,13 @@ auto WorkerPool::try_submit(HandlerTask&& task) -> bool {
             return false;
         }
         if (tasks_.size() >= task_capacity_) {
-            return false;
+            if (options_.task_queue_overflow == TaskQueueOverflowPolicy::DropOldestPendingTask) {
+                if (!tasks_.empty()) {
+                    tasks_.pop_front();
+                }
+            } else {
+                return false;
+            }
         }
         tasks_.push_back(std::move(task));
     }
@@ -103,13 +118,23 @@ void WorkerPool::worker_loop() {
 
         {
             std::unique_lock<std::mutex> lock(result_mutex_);
-            result_cv_.wait(lock, [this] {
-                return stop_.load(std::memory_order_acquire) || results_.size() < result_capacity_;
-            });
-            if (stop_.load(std::memory_order_acquire)) {
-                return;
+            if (options_.result_queue_overflow == ResultQueueOverflowPolicy::DropOldestCompletedResult) {
+                while (results_.size() >= result_capacity_ && !results_.empty()) {
+                    results_.pop_front();
+                }
+                if (stop_.load(std::memory_order_acquire)) {
+                    return;
+                }
+                results_.push_back(std::move(done));
+            } else {
+                result_cv_.wait(lock, [this] {
+                    return stop_.load(std::memory_order_acquire) || results_.size() < result_capacity_;
+                });
+                if (stop_.load(std::memory_order_acquire)) {
+                    return;
+                }
+                results_.push_back(std::move(done));
             }
-            results_.push_back(std::move(done));
         }
         result_cv_.notify_one();
     }
