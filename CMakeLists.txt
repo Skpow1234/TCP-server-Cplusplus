@@ -74,6 +74,7 @@ if(TCP_SERVER_BUILD_TESTS)
         tests/unit/dispatcher_tests.cpp
         tests/unit/worker_pool_tests.cpp
         tests/unit/idle_timeout_manager_tests.cpp
+        tests/unit/lifecycle_tests.cpp
     )
     target_link_libraries(unit_config_tests PRIVATE tcp_server_core Catch2::Catch2WithMain)
 
