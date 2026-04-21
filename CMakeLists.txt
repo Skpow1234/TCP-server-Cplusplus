@@ -24,6 +24,7 @@ add_library(tcp_server_core STATIC
     src/protocol/frame_decoder.cpp
     src/protocol/frame_encoder.cpp
     src/app/dispatcher.cpp
+    src/runtime/worker_pool.cpp
     src/config/config_loader.cpp
     src/config/config_validator.cpp
     src/infra/logging.cpp
@@ -70,6 +71,7 @@ if(TCP_SERVER_BUILD_TESTS)
         tests/unit/frame_decoder_tests.cpp
         tests/unit/frame_encoder_tests.cpp
         tests/unit/dispatcher_tests.cpp
+        tests/unit/worker_pool_tests.cpp
     )
     target_link_libraries(unit_config_tests PRIVATE tcp_server_core Catch2::Catch2WithMain)
 
@@ -132,6 +134,7 @@ if(TCP_SERVER_ENABLE_CLANG_TIDY)
             src/protocol/frame_decoder.cpp
             src/protocol/frame_encoder.cpp
             src/app/dispatcher.cpp
+            src/runtime/worker_pool.cpp
         )
 
         add_custom_target(clang-tidy
