@@ -74,6 +74,7 @@ if(TCP_SERVER_BUILD_TESTS)
         tests/unit/frame_encoder_tests.cpp
         tests/unit/dispatcher_tests.cpp
         tests/unit/worker_pool_tests.cpp
+        tests/unit/thread_safety_stress_tests.cpp
         tests/unit/idle_timeout_manager_tests.cpp
         tests/unit/lifecycle_tests.cpp
     )
