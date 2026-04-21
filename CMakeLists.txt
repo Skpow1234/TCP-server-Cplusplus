@@ -92,6 +92,12 @@ if(TCP_SERVER_BUILD_TESTS)
     target_link_libraries(integration_echo_roundtrip_tests PRIVATE tcp_server_core)
     add_test(NAME integration_echo_roundtrip_tests COMMAND integration_echo_roundtrip_tests)
 
+    add_executable(integration_graceful_shutdown_tests
+        tests/integration/graceful_shutdown_tests.cpp
+    )
+    target_link_libraries(integration_graceful_shutdown_tests PRIVATE tcp_server_core)
+    add_test(NAME integration_graceful_shutdown_tests COMMAND integration_graceful_shutdown_tests)
+
     if(WIN32)
         get_filename_component(TCP_SERVER_TOOLCHAIN_BIN_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
         set_tests_properties(unit_config_tests PROPERTIES
@@ -101,6 +107,9 @@ if(TCP_SERVER_BUILD_TESTS)
             ENVIRONMENT "PATH=${TCP_SERVER_TOOLCHAIN_BIN_DIR};$ENV{PATH}"
         )
         set_tests_properties(integration_echo_roundtrip_tests PROPERTIES
+            ENVIRONMENT "PATH=${TCP_SERVER_TOOLCHAIN_BIN_DIR};$ENV{PATH}"
+        )
+        set_tests_properties(integration_graceful_shutdown_tests PROPERTIES
             ENVIRONMENT "PATH=${TCP_SERVER_TOOLCHAIN_BIN_DIR};$ENV{PATH}"
         )
     endif()
