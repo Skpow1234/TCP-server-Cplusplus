@@ -242,7 +242,9 @@ if(TCP_SERVER_ENABLE_CLANG_TIDY)
             set(_tcp_server_clang_tidy_extra_args "")
             if(TCP_SERVER_CLANG_TIDY_EXTRA_ARGS)
                 foreach(_arg IN LISTS TCP_SERVER_CLANG_TIDY_EXTRA_ARGS)
-                    list(APPEND _tcp_server_clang_tidy_extra_args "--extra-arg=${_arg}")
+                    # These must come BEFORE the compile command from compile_commands.json,
+                    # otherwise they may not override the default toolchain include paths.
+                    list(APPEND _tcp_server_clang_tidy_extra_args "--extra-arg-before=${_arg}")
                 endforeach()
             endif()
 

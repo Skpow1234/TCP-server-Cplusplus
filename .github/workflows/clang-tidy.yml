@@ -33,7 +33,7 @@ jobs:
           GCC_TRIPLE="$("/usr/bin/$CI_CXX" -dumpmachine)"
           cmake --preset clang-tidy-ci \
             -D CMAKE_CXX_COMPILER="$CI_CXX" \
-            -D TCP_SERVER_CLANG_TIDY_EXTRA_ARGS="--gcc-toolchain=/usr;-isystem/usr/include/c++/${GCC_VER};-isystem/usr/include/${GCC_TRIPLE}/c++/${GCC_VER};-isystem/usr/lib/gcc/${GCC_TRIPLE}/${GCC_VER}/include;-isystem/usr/lib/gcc/${GCC_TRIPLE}/${GCC_VER}/include-fixed"
+            -D TCP_SERVER_CLANG_TIDY_EXTRA_ARGS="-nostdinc++;--gcc-toolchain=/usr;-isystem/usr/include/c++/${GCC_VER};-isystem/usr/include/${GCC_TRIPLE}/c++/${GCC_VER};-isystem/usr/lib/gcc/${GCC_TRIPLE}/${GCC_VER}/include;-isystem/usr/lib/gcc/${GCC_TRIPLE}/${GCC_VER}/include-fixed"
           cmake --build --preset clang-tidy-ci --parallel
 
       - name: clang-tidy gate
