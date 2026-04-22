@@ -42,10 +42,14 @@ jobs:
 
           # Point clang at libstdc++ ${STDLIB_VER} explicitly so <expected>/<jthread> resolve
           # regardless of which libstdc++ clang-18 would otherwise default to on this runner.
+          # Also bump __cpp_concepts: clang-18 reports 201907L, but libstdc++-14's <expected>
+          # header gates on __cpp_concepts >= 202002L, so without this std::expected is not declared.
           STDLIB_FLAGS="-nostdinc++ \
             -isystem/usr/include/c++/${STDLIB_VER} \
             -isystem/usr/include/${ARCH_TRIPLE}/c++/${STDLIB_VER} \
-            -isystem/usr/include/c++/${STDLIB_VER}/backward"
+            -isystem/usr/include/c++/${STDLIB_VER}/backward \
+            -D__cpp_concepts=202002L \
+            -Wno-builtin-macro-redefined"
 
           cmake --preset clang-tidy-ci \
             -D CMAKE_CXX_COMPILER="$CI_CXX" \
