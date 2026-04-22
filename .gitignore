@@ -37,6 +37,7 @@ _deps/
 benchmark_results/
 *.csv
 *.json.bench
+docs/baselines/current*.json
 
 # Editor artifacts
 *.swp

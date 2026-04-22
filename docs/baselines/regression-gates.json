@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "description": "Max allowed cpu_time per benchmark (nanoseconds). See docs/PERFORMANCE.md. Update when baselines change intentionally.",
+  "reference": "MinGW Debug, benchmark v1.9.0, ~2026-04-21; gates ~125% of observed cpu_time rounded up.",
+  "gates": [
+    { "name": "decode_single/payload=0", "max_cpu_time_ns": 70 },
+    { "name": "decode_single/payload=64", "max_cpu_time_ns": 310 },
+    { "name": "decode_single/payload=1024", "max_cpu_time_ns": 330 },
+    { "name": "decode_single/payload=4096", "max_cpu_time_ns": 350 },
+    { "name": "decode_single/payload=65535", "max_cpu_time_ns": 2800000 },
+    { "name": "decode_stream/frames=256/64/256", "max_cpu_time_ns": 70000 },
+    { "name": "decode_stream/frames=256/1024/256", "max_cpu_time_ns": 90000 },
+    { "name": "EchoConcurrent/wall_clients_rtts_payloadB/4/4/64/manual_time", "max_cpu_time_ns": 600000 },
+    { "name": "EchoConcurrent/wall_clients_rtts_payloadB/16/1/64/manual_time", "max_cpu_time_ns": 950000 },
+    { "name": "EchoSinglePipelined/wall_rtts_payloadB/32/64/manual_time", "max_cpu_time_ns": 2000000 },
+    { "name": "EchoSinglePipelined/wall_rtts_payloadB/128/64/manual_time", "max_cpu_time_ns": 9000000 }
+  ]
+}
