@@ -105,6 +105,23 @@
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_CXX_COMPILER": "clang++"
       }
+    },
+    {
+      "name": "fuzz-standalone",
+      "displayName": "MinGW Debug + decoder fuzz harness (file/stdin replay)",
+      "inherits": "mingw-debug",
+      "cacheVariables": {
+        "TCP_SERVER_BUILD_FUZZ": "ON"
+      }
+    },
+    {
+      "name": "fuzz-libfuzzer",
+      "displayName": "Clang Debug + libFuzzer decoder harness",
+      "inherits": "clang-tidy-ci",
+      "cacheVariables": {
+        "TCP_SERVER_BUILD_FUZZ": "ON",
+        "TCP_SERVER_FUZZ_LIBFUZZER": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -143,6 +160,14 @@
     {
       "name": "clang-tidy-ci",
       "configurePreset": "clang-tidy-ci"
+    },
+    {
+      "name": "fuzz-standalone",
+      "configurePreset": "fuzz-standalone"
+    },
+    {
+      "name": "fuzz-libfuzzer",
+      "configurePreset": "fuzz-libfuzzer"
     }
   ],
   "testPresets": [

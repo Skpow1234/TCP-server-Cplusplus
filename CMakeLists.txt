@@ -11,6 +11,16 @@ option(TCP_SERVER_BUILD_BENCHMARKS "Build benchmark targets" ON)
 option(TCP_SERVER_ENABLE_CLANG_TIDY "Enable clang-tidy target" ON)
 option(TCP_SERVER_ADD_SANITIZER_DRIVER_TARGETS "Add sanitizer-*-test targets (configure/build/ctest out-of-tree sanitizer presets)" ON)
 
+include(CMakeDependentOption)
+option(TCP_SERVER_BUILD_FUZZ "Build decoder fuzz harness (fuzz_decoder)" OFF)
+cmake_dependent_option(
+    TCP_SERVER_FUZZ_LIBFUZZER
+    "Build fuzz_decoder with LLVM libFuzzer (-fsanitize=fuzzer; Clang/GCC only)"
+    OFF
+    "TCP_SERVER_BUILD_FUZZ"
+    OFF
+)
+
 add_library(tcp_server_core STATIC
     src/core/runtime.cpp
     src/core/lifecycle.cpp
@@ -138,6 +148,25 @@ if(TCP_SERVER_BUILD_BENCHMARKS)
     target_link_libraries(benchmark_decoder PRIVATE tcp_server_core benchmark::benchmark_main)
 endif()
 
+if(TCP_SERVER_BUILD_FUZZ)
+    add_executable(fuzz_decoder fuzz/decoder_fuzz.cpp)
+    target_link_libraries(fuzz_decoder PRIVATE tcp_server_core)
+    target_compile_features(fuzz_decoder PRIVATE cxx_std_23)
+    if(MSVC)
+        target_compile_options(fuzz_decoder PRIVATE /W4 /permissive-)
+    else()
+        target_compile_options(fuzz_decoder PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    if(TCP_SERVER_FUZZ_LIBFUZZER)
+        if(MSVC)
+            message(FATAL_ERROR "TCP_SERVER_FUZZ_LIBFUZZER is not supported with MSVC (use Clang or GCC).")
+        endif()
+        target_compile_definitions(fuzz_decoder PRIVATE TCP_SERVER_LIBFUZZER=1)
+        target_compile_options(fuzz_decoder PRIVATE -fsanitize=fuzzer)
+        target_link_options(fuzz_decoder PRIVATE -fsanitize=fuzzer)
+    endif()
+endif()
+
 if(TCP_SERVER_ADD_SANITIZER_DRIVER_TARGETS)
     macro(tcp_server_add_sanitizer_driver target_name preset_name)
         add_custom_target(
@@ -176,6 +205,12 @@ if(TCP_SERVER_ENABLE_CLANG_TIDY)
                 "${CMAKE_SOURCE_DIR}/benchmarks/*.cpp"
             )
             list(APPEND TCP_SERVER_CLANG_TIDY_SOURCES ${_tcp_server_tidy_benchmarks})
+        endif()
+        if(TCP_SERVER_BUILD_FUZZ)
+            file(GLOB_RECURSE _tcp_server_tidy_fuzz CONFIGURE_DEPENDS
+                "${CMAKE_SOURCE_DIR}/fuzz/*.cpp"
+            )
+            list(APPEND TCP_SERVER_CLANG_TIDY_SOURCES ${_tcp_server_tidy_fuzz})
         endif()
 
         if(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")

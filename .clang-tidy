@@ -1,6 +1,6 @@
 ---
 # First-party paths only (third-party lives under build trees).
-HeaderFilterRegex: '^(src|include|tests|benchmarks)/'
+HeaderFilterRegex: '^(src|include|tests|benchmarks|fuzz)/'
 
 # Broad discovery; noisy or macro-heavy checks are disabled. CI runs this with
 # `clang++` compile_commands (see .github/workflows/clang-tidy.yml).
