@@ -24,6 +24,17 @@ namespace {
     return (mask & bit) != EventMask::None;
 }
 
+// POSIX fd_set uses int; Winsock uses SOCKET.
+#if defined(_WIN32)
+[[nodiscard]] constexpr auto as_select_fd(const NativeSocket s) noexcept -> SOCKET {
+    return static_cast<SOCKET>(s);
+}
+#else
+[[nodiscard]] constexpr auto as_select_fd(const NativeSocket s) noexcept -> int {
+    return static_cast<int>(s);
+}
+#endif
+
 }  // namespace
 
 auto SelectPoller::upsert(NativeSocket socket, EventMask interest) -> std::expected<void, PollError> {
@@ -55,13 +66,13 @@ auto SelectPoller::wait(std::span<Event> out_events, std::int32_t timeout_ms)
     NativeSocket max_fd = 0;
     for (const auto& [sock, mask] : interest_) {
         if (has(mask, EventMask::Read)) {
-            FD_SET(static_cast<SOCKET>(sock), &readfds);
+            FD_SET(as_select_fd(sock), &readfds);
         }
         if (has(mask, EventMask::Write)) {
-            FD_SET(static_cast<SOCKET>(sock), &writefds);
+            FD_SET(as_select_fd(sock), &writefds);
         }
         if (has(mask, EventMask::Error)) {
-            FD_SET(static_cast<SOCKET>(sock), &exceptfds);
+            FD_SET(as_select_fd(sock), &exceptfds);
         }
         if (sock > max_fd) {
             max_fd = sock;
@@ -98,13 +109,13 @@ auto SelectPoller::wait(std::span<Event> out_events, std::int32_t timeout_ms)
             break;
         }
         EventMask fired = EventMask::None;
-        if (FD_ISSET(static_cast<SOCKET>(sock), &readfds)) {
+        if (FD_ISSET(as_select_fd(sock), &readfds) != 0) {
             fired = fired | EventMask::Read;
         }
-        if (FD_ISSET(static_cast<SOCKET>(sock), &writefds)) {
+        if (FD_ISSET(as_select_fd(sock), &writefds) != 0) {
             fired = fired | EventMask::Write;
         }
-        if (FD_ISSET(static_cast<SOCKET>(sock), &exceptfds)) {
+        if (FD_ISSET(as_select_fd(sock), &exceptfds) != 0) {
             fired = fired | EventMask::Error;
         }
         if (fired != EventMask::None) {

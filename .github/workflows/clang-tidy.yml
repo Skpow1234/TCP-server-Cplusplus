@@ -14,11 +14,18 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang clang-tidy cmake ninja-build
+          sudo apt-get install -y g++-14 || sudo apt-get install -y g++-12
 
       - name: Configure and build (clang-tidy-ci preset)
         working-directory: ${{ github.workspace }}
         run: |
-          cmake --preset clang-tidy-ci
+          # Clang on Ubuntu often links against an older libstdc++ that lacks C++23 std::expected.
+          # Build with a recent g++ so compile_commands.json uses a complete standard library; clang-tidy still analyzes the same sources.
+          if command -v g++-14 >/dev/null 2>&1; then CI_CXX=g++-14
+          elif command -v g++-13 >/dev/null 2>&1; then CI_CXX=g++-13
+          elif command -v g++-12 >/dev/null 2>&1; then CI_CXX=g++-12
+          else echo "Install g++-12 or newer for C++23 std::expected"; exit 1; fi
+          cmake --preset clang-tidy-ci -D CMAKE_CXX_COMPILER="$CI_CXX"
           cmake --build --preset clang-tidy-ci --parallel
 
       - name: clang-tidy gate
