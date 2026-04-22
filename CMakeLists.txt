@@ -162,27 +162,53 @@ endif()
 if(TCP_SERVER_ENABLE_CLANG_TIDY)
     find_program(CLANG_TIDY_EXE NAMES clang-tidy)
     if(CLANG_TIDY_EXE)
-        set(TCP_SERVER_CLANG_TIDY_SOURCES
-            src/main.cpp
-            src/core/runtime.cpp
-            src/core/lifecycle.cpp
-            src/protocol/frame_decoder.cpp
-            src/protocol/frame_encoder.cpp
-            src/app/dispatcher.cpp
-            src/runtime/worker_pool.cpp
-            src/net/idle_timeout_manager.cpp
+        file(GLOB_RECURSE TCP_SERVER_CLANG_TIDY_SOURCES CONFIGURE_DEPENDS
+            "${CMAKE_SOURCE_DIR}/src/*.cpp"
         )
+        if(TCP_SERVER_BUILD_TESTS)
+            file(GLOB_RECURSE _tcp_server_tidy_tests CONFIGURE_DEPENDS
+                "${CMAKE_SOURCE_DIR}/tests/*.cpp"
+            )
+            list(APPEND TCP_SERVER_CLANG_TIDY_SOURCES ${_tcp_server_tidy_tests})
+        endif()
+        if(TCP_SERVER_BUILD_BENCHMARKS)
+            file(GLOB_RECURSE _tcp_server_tidy_benchmarks CONFIGURE_DEPENDS
+                "${CMAKE_SOURCE_DIR}/benchmarks/*.cpp"
+            )
+            list(APPEND TCP_SERVER_CLANG_TIDY_SOURCES ${_tcp_server_tidy_benchmarks})
+        endif()
 
-        add_custom_target(clang-tidy
-            COMMAND
-                ${CLANG_TIDY_EXE}
-                --quiet
-                -p ${CMAKE_BINARY_DIR}
-                ${TCP_SERVER_CLANG_TIDY_SOURCES}
-            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-            COMMENT "Running clang-tidy"
-            VERBATIM
-        )
+        if(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+            # LLVM's clang-tidy cannot reliably parse MinGW libstdc++ headers for this tree; use CI
+            # (Linux + clang++) or a libc++/MSVC-backed compile_commands.json locally.
+            add_custom_target(clang-tidy
+                COMMAND ${CMAKE_COMMAND} -E echo
+                "clang-tidy: skipped on MinGW+g++ (use GitHub Actions clang-tidy job or configure with clang++)."
+                COMMAND ${CMAKE_COMMAND} -E true
+                WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+                COMMENT "clang-tidy (skipped on this toolchain)"
+                VERBATIM
+            )
+        else()
+            add_custom_target(clang-tidy
+                COMMAND
+                    ${CLANG_TIDY_EXE}
+                    --quiet
+                    "-p=${CMAKE_BINARY_DIR}"
+                    ${TCP_SERVER_CLANG_TIDY_SOURCES}
+                WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+                COMMENT "Running clang-tidy on first-party sources"
+                VERBATIM
+            )
+        endif()
+
+        if(TCP_SERVER_BUILD_TESTS)
+            add_test(
+                NAME clang_tidy_gate
+                COMMAND ${CMAKE_COMMAND} --build "${CMAKE_BINARY_DIR}" --target clang-tidy
+            )
+            set_tests_properties(clang_tidy_gate PROPERTIES LABELS "static_analysis")
+        endif()
     else()
         message(WARNING "clang-tidy not found; 'clang-tidy' target will not be available.")
     endif()

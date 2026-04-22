@@ -1,0 +1,26 @@
+name: clang-tidy
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  clang-tidy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang clang-tidy cmake ninja-build
+
+      - name: Configure and build (clang-tidy-ci preset)
+        working-directory: ${{ github.workspace }}
+        run: |
+          cmake --preset clang-tidy-ci
+          cmake --build --preset clang-tidy-ci --parallel
+
+      - name: clang-tidy gate
+        working-directory: ${{ github.workspace }}
+        run: cmake --build "${{ github.workspace }}/out/build/clang-tidy-ci" --target clang-tidy

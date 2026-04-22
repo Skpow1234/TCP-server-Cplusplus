@@ -96,6 +96,15 @@
         "CMAKE_CXX_FLAGS": "-fsanitize=thread -fno-omit-frame-pointer",
         "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=thread"
       }
+    },
+    {
+      "name": "clang-tidy-ci",
+      "displayName": "Clang Debug (clang-tidy / CI parity)",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_COMPILER": "clang++"
+      }
     }
   ],
   "buildPresets": [
@@ -130,6 +139,10 @@
     {
       "name": "mingw-tsan",
       "configurePreset": "mingw-tsan"
+    },
+    {
+      "name": "clang-tidy-ci",
+      "configurePreset": "clang-tidy-ci"
     }
   ],
   "testPresets": [

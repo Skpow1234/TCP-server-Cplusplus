@@ -1,37 +1,63 @@
 ---
+# First-party paths only (third-party lives under build trees).
+HeaderFilterRegex: '^(src|include|tests|benchmarks)/'
+
+# Broad discovery; noisy or macro-heavy checks are disabled. CI runs this with
+# `clang++` compile_commands (see .github/workflows/clang-tidy.yml).
 Checks: >
   -*,
-  bugprone-*,
   clang-analyzer-*,
+  bugprone-*,
+  -bugprone-branch-clone,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-empty-catch,
+  -bugprone-exception-escape,
+  -bugprone-throwing-static-initialization,
   cppcoreguidelines-*,
   -cppcoreguidelines-avoid-do-while,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-avoid-non-const-global-variables,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-pro-type-vararg,
   misc-*,
+  -misc-include-cleaner,
+  -misc-no-recursion,
+  -misc-use-anonymous-namespace,
+  -misc-use-internal-linkage,
   modernize-*,
   -modernize-use-trailing-return-type,
   performance-*,
   portability-*,
-  readability-*
+  readability-*,
+  -readability-convert-member-functions-to-static,
+  -readability-function-cognitive-complexity,
+  -readability-magic-numbers,
+  -readability-use-concise-preprocessor-directives
 
+# Style / guidelines remain warnings so the gate stays focused on analyzer, bugprone, and performance.
 WarningsAsErrors: >
   clang-analyzer-*,
   bugprone-*,
-  cppcoreguidelines-*,
-  modernize-*,
+  -bugprone-branch-clone,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-empty-catch,
+  -bugprone-exception-escape,
+  -bugprone-throwing-static-initialization,
   performance-*
 
-HeaderFilterRegex: '^(src|include|tests|benchmarks)/'
-
 CheckOptions:
-  - key:             modernize-use-trailing-return-type.IgnoreMacros
-    value:           'true'
-  - key:             readability-identifier-naming.IgnoreMainLikeFunctions
-    value:           'true'
-  - key:             cppcoreguidelines-avoid-magic-numbers.IgnoredIntegerValues
-    value:           '0;1;2;3;4;8;16;32;64;100;1024'
-  - key:             cppcoreguidelines-avoid-magic-numbers.IgnoredFloatingPointValues
-    value:           '0.0;1.0'
-  - key:             cppcoreguidelines-pro-type-vararg.IgnoreCFunctions
-    value:           'true'
-
-...
-
+  - key: readability-identifier-length.MinimumVariableNameLength
+    value: '2'
+  - key: readability-identifier-length.MinimumParameterNameLength
+    value: '2'
+  - key: modernize-use-trailing-return-type.IgnoreMacros
+    value: 'true'
+  - key: readability-identifier-naming.IgnoreMainLikeFunctions
+    value: 'true'
+  - key: cppcoreguidelines-avoid-magic-numbers.IgnoredIntegerValues
+    value: '0;1;2;3;4;8;16;32;64;100;1024'
+  - key: cppcoreguidelines-avoid-magic-numbers.IgnoredFloatingPointValues
+    value: '0.0;1.0'
+  - key: cppcoreguidelines-pro-type-vararg.IgnoreCFunctions
+    value: 'true'

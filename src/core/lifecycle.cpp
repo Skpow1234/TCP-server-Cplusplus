@@ -4,11 +4,15 @@ namespace tcp_server::core {
 
 void ShutdownCoordinator::request_shutdown() {
     for (;;) {
-        auto p = phase_.load(std::memory_order_acquire);
-        if (p != ShutdownPhase::Running) {
+        auto expected_phase = phase_.load(std::memory_order_acquire);
+        if (expected_phase != ShutdownPhase::Running) {
             return;
         }
-        if (phase_.compare_exchange_weak(p, ShutdownPhase::Draining, std::memory_order_acq_rel, std::memory_order_acquire)) {
+        if (phase_.compare_exchange_weak(
+                expected_phase,
+                ShutdownPhase::Draining,
+                std::memory_order_acq_rel,
+                std::memory_order_acquire)) {
             return;
         }
     }

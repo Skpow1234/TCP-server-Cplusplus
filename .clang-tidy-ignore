@@ -1,0 +1,5 @@
+# Build trees and fetched dependencies (never analyze).
+out/
+**/out/
+**/_deps/
+**/CMakeFiles/
