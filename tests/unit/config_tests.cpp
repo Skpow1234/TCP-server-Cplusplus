@@ -31,11 +31,32 @@
 #else
 #    include <arpa/inet.h>
 #    include <netinet/in.h>
+#    include <stdlib.h>  // setenv, unsetenv (POSIX)
 #    include <sys/socket.h>
 #    include <unistd.h>
 #endif
 
 namespace {
+
+#if defined(_WIN32)
+[[nodiscard]] auto test_env_set(const char* key, const char* value) -> int {
+    const std::string assignment = std::string(key) + "=" + value;
+    return ::_putenv(assignment.c_str());
+}
+
+[[nodiscard]] auto test_env_unset(const char* key) -> int {
+    const std::string assignment = std::string(key) + "=";
+    return ::_putenv(assignment.c_str());
+}
+#else
+[[nodiscard]] auto test_env_set(const char* key, const char* value) -> int {
+    return ::setenv(key, value, 1);
+}
+
+[[nodiscard]] auto test_env_unset(const char* key) -> int {
+    return ::unsetenv(key);
+}
+#endif
 
 auto connect_v4_loopback(std::uint16_t port) -> bool {
 #if defined(_WIN32)
@@ -254,11 +275,11 @@ TEST_CASE("config loader: environment overrides apply") {
         out << "listen.port=1000\n";
     }
 
-    REQUIRE(_putenv("TCP_SERVER__listen__port=2000") == 0);
+    REQUIRE(test_env_set("TCP_SERVER__listen__port", "2000") == 0);
     const auto loaded = tcp_server::load_config_from_file(path);
     REQUIRE(loaded.has_value());
     REQUIRE(loaded->listen.port == 2000);
-    REQUIRE(_putenv("TCP_SERVER__listen__port=") == 0);
+    REQUIRE(test_env_unset("TCP_SERVER__listen__port") == 0);
 }
 
 TEST_CASE("config loader: invalid environment override fails") {
@@ -269,12 +290,12 @@ TEST_CASE("config loader: invalid environment override fails") {
         out << "listen.port=1000\n";
     }
 
-    REQUIRE(_putenv("TCP_SERVER__listen__port=99999") == 0);
+    REQUIRE(test_env_set("TCP_SERVER__listen__port", "99999") == 0);
     const auto loaded = tcp_server::load_config_from_file(path);
     REQUIRE(!loaded.has_value());
     REQUIRE(loaded.error().code == tcp_server::ConfigLoadError::Code::InvalidValue);
     REQUIRE(loaded.error().line == 0);
-    REQUIRE(_putenv("TCP_SERVER__listen__port=") == 0);
+    REQUIRE(test_env_unset("TCP_SERVER__listen__port") == 0);
 }
 
 TEST_CASE("config validator: max_message_bytes guardrail triggers") {
