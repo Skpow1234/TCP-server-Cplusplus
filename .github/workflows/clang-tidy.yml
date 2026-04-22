@@ -27,7 +27,10 @@ jobs:
           elif command -v g++-13 >/dev/null 2>&1; then CI_CXX=g++-13
           elif command -v g++-12 >/dev/null 2>&1; then CI_CXX=g++-12
           else echo "Install g++-12 or newer for C++23 std::expected"; exit 1; fi
-          cmake --preset clang-tidy-ci -D CMAKE_CXX_COMPILER="$CI_CXX" -D TCP_SERVER_CLANG_TIDY_QUERY_DRIVER="/usr/bin/$CI_CXX"
+          GCC_INSTALL_DIR="$(dirname "$("/usr/bin/$CI_CXX" -print-libgcc-file-name)")"
+          cmake --preset clang-tidy-ci \
+            -D CMAKE_CXX_COMPILER="$CI_CXX" \
+            -D TCP_SERVER_CLANG_TIDY_EXTRA_ARGS="--gcc-install-dir=${GCC_INSTALL_DIR}"
           cmake --build --preset clang-tidy-ci --parallel
 
       - name: clang-tidy gate
