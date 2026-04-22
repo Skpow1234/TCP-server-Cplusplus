@@ -194,24 +194,30 @@ if(TCP_SERVER_ADD_SANITIZER_DRIVER_TARGETS)
 endif()
 
 if(TCP_SERVER_ENABLE_CLANG_TIDY)
-    find_program(CLANG_TIDY_EXE NAMES clang-tidy)
+    option(TCP_SERVER_CLANG_TIDY_INCLUDE_TESTS "Run clang-tidy over tests/ (can be very noisy)" OFF)
+    option(TCP_SERVER_CLANG_TIDY_INCLUDE_BENCHMARKS "Run clang-tidy over benchmarks/ (can be very noisy)" OFF)
+    option(TCP_SERVER_CLANG_TIDY_INCLUDE_FUZZ "Run clang-tidy over fuzz/ (can be very noisy)" OFF)
+    set(TCP_SERVER_CLANG_TIDY_QUERY_DRIVER "" CACHE STRING "Optional clang-tidy --query-driver (e.g. /usr/bin/g++-14) to pick correct system include paths")
+
+    # Prefer a modern clang-tidy when multiple are installed (needed for --query-driver and newer C++ support).
+    find_program(CLANG_TIDY_EXE NAMES clang-tidy-18 clang-tidy-17 clang-tidy-16 clang-tidy)
     if(CLANG_TIDY_EXE)
         file(GLOB_RECURSE TCP_SERVER_CLANG_TIDY_SOURCES CONFIGURE_DEPENDS
             "${CMAKE_SOURCE_DIR}/src/*.cpp"
         )
-        if(TCP_SERVER_BUILD_TESTS)
+        if(TCP_SERVER_BUILD_TESTS AND TCP_SERVER_CLANG_TIDY_INCLUDE_TESTS)
             file(GLOB_RECURSE _tcp_server_tidy_tests CONFIGURE_DEPENDS
                 "${CMAKE_SOURCE_DIR}/tests/*.cpp"
             )
             list(APPEND TCP_SERVER_CLANG_TIDY_SOURCES ${_tcp_server_tidy_tests})
         endif()
-        if(TCP_SERVER_BUILD_BENCHMARKS)
+        if(TCP_SERVER_BUILD_BENCHMARKS AND TCP_SERVER_CLANG_TIDY_INCLUDE_BENCHMARKS)
             file(GLOB_RECURSE _tcp_server_tidy_benchmarks CONFIGURE_DEPENDS
                 "${CMAKE_SOURCE_DIR}/benchmarks/*.cpp"
             )
             list(APPEND TCP_SERVER_CLANG_TIDY_SOURCES ${_tcp_server_tidy_benchmarks})
         endif()
-        if(TCP_SERVER_BUILD_FUZZ)
+        if(TCP_SERVER_BUILD_FUZZ AND TCP_SERVER_CLANG_TIDY_INCLUDE_FUZZ)
             file(GLOB_RECURSE _tcp_server_tidy_fuzz CONFIGURE_DEPENDS
                 "${CMAKE_SOURCE_DIR}/fuzz/*.cpp"
             )
@@ -230,10 +236,16 @@ if(TCP_SERVER_ENABLE_CLANG_TIDY)
                 VERBATIM
             )
         else()
+            set(_tcp_server_clang_tidy_query_driver_args "")
+            if(TCP_SERVER_CLANG_TIDY_QUERY_DRIVER)
+                list(APPEND _tcp_server_clang_tidy_query_driver_args "--query-driver=${TCP_SERVER_CLANG_TIDY_QUERY_DRIVER}")
+            endif()
+
             add_custom_target(clang-tidy
                 COMMAND
                     ${CLANG_TIDY_EXE}
                     --quiet
+                    ${_tcp_server_clang_tidy_query_driver_args}
                     "-p=${CMAKE_BINARY_DIR}"
                     ${TCP_SERVER_CLANG_TIDY_SOURCES}
                 WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
