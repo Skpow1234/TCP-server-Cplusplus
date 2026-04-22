@@ -13,26 +13,28 @@ jobs:
       - name: Install toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build
-          # Prefer a modern clang-tidy when available (needed for --query-driver and newer C++ support).
-          sudo apt-get install -y clang-tidy-18 || sudo apt-get install -y clang-tidy
+          sudo apt-get install -y cmake ninja-build
+          # Pair clang-18 with clang-tidy-18 so analyzer and compiler share a frontend.
+          sudo apt-get install -y clang-18 clang-tidy-18 || sudo apt-get install -y clang clang-tidy
+          # Install a recent libstdc++ so std::expected is available (pinned below via --gcc-install-dir).
           sudo apt-get install -y g++-14 || sudo apt-get install -y g++-12
 
       - name: Configure and build (clang-tidy-ci preset)
         working-directory: ${{ github.workspace }}
         run: |
-          # Clang on Ubuntu often links against an older libstdc++ that lacks C++23 std::expected.
-          # Build with a recent g++ so compile_commands.json uses a complete standard library; clang-tidy still analyzes the same sources.
-          if command -v g++-14 >/dev/null 2>&1; then CI_CXX=g++-14
-          elif command -v g++-13 >/dev/null 2>&1; then CI_CXX=g++-13
-          elif command -v g++-12 >/dev/null 2>&1; then CI_CXX=g++-12
+          # Build with clang++ so compile_commands.json is clang-compatible and clang-tidy replays identical flags.
+          if command -v clang++-18 >/dev/null 2>&1; then CI_CXX=clang++-18
+          elif command -v clang++ >/dev/null 2>&1; then CI_CXX=clang++
+          else echo "clang++ is required for the clang-tidy CI job"; exit 1; fi
+          # Pin clang to the newest GCC install available so its libstdc++ provides C++23 std::expected.
+          if command -v g++-14 >/dev/null 2>&1; then GCC_HOST=g++-14
+          elif command -v g++-13 >/dev/null 2>&1; then GCC_HOST=g++-13
+          elif command -v g++-12 >/dev/null 2>&1; then GCC_HOST=g++-12
           else echo "Install g++-12 or newer for C++23 std::expected"; exit 1; fi
-          # clang-tidy runs clang under the hood and must be pinned to the same GCC install
-          # so it sees the same libstdc++ headers (C++23 std::expected).
-          GCC_INSTALL_DIR="$(dirname "$("/usr/bin/$CI_CXX" -print-libgcc-file-name)")"
+          GCC_INSTALL_DIR="$(dirname "$("/usr/bin/$GCC_HOST" -print-libgcc-file-name)")"
           cmake --preset clang-tidy-ci \
             -D CMAKE_CXX_COMPILER="$CI_CXX" \
-            -D TCP_SERVER_CLANG_TIDY_EXTRA_ARGS="--gcc-install-dir=${GCC_INSTALL_DIR}"
+            -D CMAKE_CXX_FLAGS="--gcc-install-dir=${GCC_INSTALL_DIR}"
           cmake --build --preset clang-tidy-ci --parallel
 
       - name: clang-tidy gate
