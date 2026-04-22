@@ -101,7 +101,7 @@ auto Listener::bind_and_listen(std::string_view host, std::uint16_t port, int ba
         }
 
         if (::bind(s, ai->ai_addr, ai->ai_addrlen) != 0) {
-            (void)sock.close();
+            [[maybe_unused]] const auto close_result = sock.close();
             continue;
         }
         if (::listen(s, backlog) != 0) {

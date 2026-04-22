@@ -51,7 +51,7 @@ NetworkSession::~NetworkSession() {
 }
 
 Socket::~Socket() {
-    (void)close();
+    [[maybe_unused]] const auto close_result = close();
 }
 
 Socket::Socket(Socket&& other) noexcept : socket_(other.socket_) {
@@ -62,7 +62,7 @@ auto Socket::operator=(Socket&& other) noexcept -> Socket& {
     if (this == &other) {
         return *this;
     }
-    (void)close();
+    [[maybe_unused]] const auto close_result = close();
     socket_ = other.socket_;
     other.socket_ = k_invalid_socket;
     return *this;
@@ -140,7 +140,7 @@ auto Socket::release() -> NativeSocket {
 }
 
 void Socket::reset(NativeSocket s) {
-    (void)close();
+    [[maybe_unused]] const auto close_result = close();
     socket_ = s;
 }
 
