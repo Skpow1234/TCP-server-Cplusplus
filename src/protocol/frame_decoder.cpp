@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <cassert>
 #include <cstring>
 #include <limits>
 
@@ -47,6 +48,9 @@ auto try_decode_frame(std::span<const std::byte> buffer, std::uint64_t max_paylo
         const auto* src = buffer.data() + k_frame_length_field_bytes;
         std::copy_n(src, out.payload.size(), out.payload.begin());
     }
+    assert(out.status == FrameDecodeResult::Status::Complete);
+    assert(out.consumed_bytes == total);
+    assert(out.consumed_bytes == k_frame_length_field_bytes + out.payload.size());
     return out;
 }
 

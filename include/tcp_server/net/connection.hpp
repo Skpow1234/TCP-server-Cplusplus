@@ -35,7 +35,7 @@ public:
     [[nodiscard]] auto socket() const -> const Socket& { return socket_; }
 
     [[nodiscard]] auto state() const -> ConnectionState { return state_; }
-    void set_state(ConnectionState state) { state_ = state; }
+    void set_state(ConnectionState state);
 
     [[nodiscard]] auto read_buffer() -> std::vector<std::byte>& { return read_buf_; }
     [[nodiscard]] auto read_buffer() const -> const std::vector<std::byte>& { return read_buf_; }

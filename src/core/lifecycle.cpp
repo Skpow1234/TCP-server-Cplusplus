@@ -1,5 +1,7 @@
 #include <tcp_server/core/lifecycle.hpp>
 
+#include <cassert>
+
 namespace tcp_server::core {
 
 void ShutdownCoordinator::request_shutdown() {
@@ -13,6 +15,7 @@ void ShutdownCoordinator::request_shutdown() {
                 ShutdownPhase::Draining,
                 std::memory_order_acq_rel,
                 std::memory_order_acquire)) {
+            assert(phase_.load(std::memory_order_acquire) == ShutdownPhase::Draining);
             return;
         }
     }
@@ -40,12 +43,17 @@ void ShutdownCoordinator::try_advance_to_stopped_if_drained(
     if (!listener_stopped || active_connection_count > 0 || any_connection_has_pending_writes) {
         return;
     }
+    assert(phase_.load(std::memory_order_acquire) == ShutdownPhase::Draining);
+    assert(listener_stopped);
+    assert(active_connection_count == 0);
+    assert(!any_connection_has_pending_writes);
     ShutdownPhase expected = ShutdownPhase::Draining;
     (void)phase_.compare_exchange_strong(
         expected,
         ShutdownPhase::Stopped,
         std::memory_order_acq_rel,
         std::memory_order_acquire);
+    assert(phase_.load(std::memory_order_acquire) == ShutdownPhase::Stopped);
 }
 
 }  // namespace tcp_server::core

@@ -3,6 +3,7 @@
 #include <tcp_server/net/connection.hpp>
 
 #include <algorithm>
+#include <cassert>
 #include <limits>
 
 namespace tcp_server::protocol {
@@ -38,8 +39,10 @@ auto append_encoded_frame(
     if (out.capacity() < out.size() + extra) {
         out.reserve(out.size() + extra);
     }
+    const std::size_t before = out.size();
     push_be32(out, len);
     out.insert(out.end(), payload.begin(), payload.end());
+    assert(out.size() == before + k_frame_length_field_bytes + payload.size());
     return {};
 }
 

@@ -1,5 +1,6 @@
 #include <tcp_server/runtime/worker_pool.hpp>
 
+#include <cassert>
 #include <span>
 #include <stdexcept>
 #include <utility>
@@ -62,6 +63,7 @@ auto WorkerPool::try_submit(HandlerTask&& task) -> bool {
             }
         }
         tasks_.push_back(std::move(task));
+        assert(tasks_.size() <= task_capacity_);
     }
     task_cv_.notify_one();
     return true;
@@ -75,6 +77,7 @@ auto WorkerPool::try_pop_result(HandlerResult& out) -> bool {
         }
         out = std::move(results_.front());
         results_.pop_front();
+        assert(results_.size() < result_capacity_);
     }
     result_cv_.notify_all();
     return true;
@@ -96,6 +99,7 @@ void WorkerPool::worker_loop() {
             }
             task = std::move(tasks_.front());
             tasks_.pop_front();
+            assert(tasks_.size() <= task_capacity_);
         }
         task_cv_.notify_all();
 
@@ -122,10 +126,13 @@ void WorkerPool::worker_loop() {
                 while (results_.size() >= result_capacity_ && !results_.empty()) {
                     results_.pop_front();
                 }
+                assert(results_.size() < result_capacity_);
                 if (stop_.load(std::memory_order_acquire)) {
                     return;
                 }
+                assert(results_.size() < result_capacity_);
                 results_.push_back(std::move(done));
+                assert(results_.size() <= result_capacity_);
             } else {
                 result_cv_.wait(lock, [this] {
                     return stop_.load(std::memory_order_acquire) || results_.size() < result_capacity_;
@@ -133,7 +140,9 @@ void WorkerPool::worker_loop() {
                 if (stop_.load(std::memory_order_acquire)) {
                     return;
                 }
+                assert(results_.size() < result_capacity_);
                 results_.push_back(std::move(done));
+                assert(results_.size() <= result_capacity_);
             }
         }
         result_cv_.notify_one();
