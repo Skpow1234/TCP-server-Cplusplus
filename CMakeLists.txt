@@ -146,6 +146,11 @@ if(TCP_SERVER_BUILD_BENCHMARKS)
         benchmarks/decoder_benchmark.cpp
     )
     target_link_libraries(benchmark_decoder PRIVATE tcp_server_core benchmark::benchmark_main)
+
+    add_executable(benchmark_e2e_echo
+        benchmarks/e2e_echo_benchmark.cpp
+    )
+    target_link_libraries(benchmark_e2e_echo PRIVATE tcp_server_core benchmark::benchmark_main)
 endif()
 
 if(TCP_SERVER_BUILD_FUZZ)
